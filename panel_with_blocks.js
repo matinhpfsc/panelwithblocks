@@ -16,6 +16,7 @@ var block_width = 0;
 var block_height = 0;
 var blockArray = null;
 var blockCount = 0;
+var staticBlockCount = 0;
 var maximumAnimationTimeSpan = 100;
 var currentScene;
 var emptyScene;
@@ -398,9 +399,9 @@ function NormalBlock(hue)
       };
 }
 
-function StaticBlock(hue)
+function CentralStaticFunctions()
 {
-   this.draw = function(context, x, y)
+   this.draw = function(context, hue, x, y)
       {
          var bgfade = context.createLinearGradient(x * block_width, y * block_height, x * block_width, (y + 1) * block_height - 1);
 
@@ -421,25 +422,24 @@ function StaticBlock(hue)
          static_hit_count--;
          if (static_hit_count <= 0)
          {
-            for (var x = 0; x < blockArray_width; x++)
-            {
-               for (var y = 0; y < blockArray_height; y++)
-               {
-                  if (blockArray[x][y].removeBlock)
-                  {
-                     blockArray[x][y].removeBlock();
-                  }
-               }
-            }
+            this.draw = function(context, x, y) {};
+            this.doCollisionEffect = function() { return false; };
+            score = score + staticBlockCount;
             blocks_canvas_is_dirty = true;
          }
          return true;
       };
-   this.removeBlock = function()
+}
+
+function StaticBlock(hue, centralStaticFunctions)
+{
+   this.draw = function(context, x, y)
       {
-         this.draw = function(context, x, y) {};
-         this.doCollisionEffect = function() { return false; };
-         score = score + 1;
+         centralStaticFunctions.draw(context, hue, x, y);
+      };
+   this.doCollisionEffect = function()
+      {
+         return centralStaticFunctions.doCollisionEffect();
       };
 }
 
@@ -473,7 +473,9 @@ function createLevel(levelDescription)
    var staticThresholdValue = values[Math.floor((values.length - 1) * 0.1)];
    var max = values[0];
    
+   var centralStaticFunctions = new CentralStaticFunctions();
    blockCount = 0;
+   staticBlockCount = 0;
    for (var x = 0; x < blockArray_width; x++)
    {
       for (var y = 0; y < blockArray_height; y++)
@@ -487,7 +489,8 @@ function createLevel(levelDescription)
          var hue = (((value - blockThresholdValue) / (max - blockThresholdValue)) * levelDescription.hueRange + levelDescription.hueOffset);
          if (value > staticThresholdValue)
          {
-            blockArray[x][y] = new StaticBlock(hue);
+            blockArray[x][y] = new StaticBlock(hue, centralStaticFunctions);
+            staticBlockCount++;
             continue;
          }
          blockArray[x][y] = new NormalBlock(hue);
