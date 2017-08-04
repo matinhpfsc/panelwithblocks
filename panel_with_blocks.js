@@ -23,7 +23,6 @@ var startMenuScene;
 var playScene;
 var gameOverScene;
 var blocks_canvas;
-var blocks_canvas_context;
 var panel_canvas;
 var ball_canvas;
 var blocks_canvas_is_dirty;
@@ -113,18 +112,16 @@ function calculatePlayScene(deltaTime)
     var cell_x = Math.trunc(ball.location.x / block_width);
     var cell_y = Math.trunc(ball.location.y / block_height);
 
-    if (GetSaveBlockArrayValue(cell_x_border, cell_y).isBlock)
-    {
-	ball.speed.x = -ball.speed.x;
-	blockArray[cell_x_border][cell_y].doCollisionEffect();
-	increaseSpeed();
-    }
-    if (GetSaveBlockArrayValue(cell_x, cell_y_border).isBlock)
-    {
-	ball.speed.y = -ball.speed.y;
-	blockArray[cell_x][cell_y_border].doCollisionEffect();
-	increaseSpeed();
-    }
+   if (GetSaveBlockArrayValue(cell_x_border, cell_y).doCollisionEffect())
+   {
+      ball.speed.x = -ball.speed.x;
+      increaseSpeed();
+   }
+   if (GetSaveBlockArrayValue(cell_x, cell_y_border).doCollisionEffect())
+   {
+      ball.speed.y = -ball.speed.y;
+      increaseSpeed();
+   }
     if (blockCount <= 0)
     {
 	playScene.activate();
@@ -158,13 +155,15 @@ function increaseSpeed()
    }
 }
 
+var noneBlock = new NoneBlock();
+
 function GetSaveBlockArrayValue(x, y)
 {
     if (x >= 0 && x < blockArray_width && y >= 0 && y < blockArray_height)
     {
         return blockArray[x][y];
     }
-    return 0;
+    return noneBlock;
 }
 
 function drawStartMenu()
@@ -191,75 +190,36 @@ function drawBall(canvasContext2, left, top, radius)
    canvasContext2.fill();
 }
 
-function drawFrame(x, y, width, height, deep, color_top, color_bottom)
+function drawFrame(context, x, y, width, height, deep, color_top, color_bottom)
 {
-  blocks_canvas_context.lineWidth = 1;
+  context.lineWidth = 1;
   for (var right_bottom_factor = 0; right_bottom_factor < 2; right_bottom_factor++)
   {
-     blocks_canvas_context.strokeStyle = right_bottom_factor == 0 ? color_top : color_bottom;
-     blocks_canvas_context.beginPath();
+     context.strokeStyle = right_bottom_factor == 0 ? color_top : color_bottom;
+     context.beginPath();
      for (var i = 0; i < deep; i++)
      {
        var q = ((1 - 2 * right_bottom_factor) * i);
-       blocks_canvas_context.moveTo(x + right_bottom_factor + i, y + height - 1 - i);
-       blocks_canvas_context.lineTo(x + (width - 1) * right_bottom_factor + q, y + (height - 1) * right_bottom_factor + q);
-       blocks_canvas_context.lineTo(x + width - 1 - i, y + right_bottom_factor + i);
+       context.moveTo(x + right_bottom_factor + i, y + height - 1 - i);
+       context.lineTo(x + (width - 1) * right_bottom_factor + q, y + (height - 1) * right_bottom_factor + q);
+       context.lineTo(x + width - 1 - i, y + right_bottom_factor + i);
      }
-     blocks_canvas_context.stroke();
+     context.stroke();
   }
-}
-
-function drawBlock_2(block, x, y)
-{
-  var color = "hsl(" + block.hue + ", 100%, 50%)";
-  var color_l = "hsl(" + block.hue + ", 100%, 80%)";
-  var color_d = "hsl(" + block.hue + ", 100%, 10%)";
-
-  blocks_canvas_context.fillStyle = color;
-  blocks_canvas_context.fillRect(x * block_width + 2, y * block_height + 2, block_width - 4, block_height - 4);
-  drawFrame(x * block_width, y * block_height, block_width, block_height, 2, color_l, color_d);
-  drawFrame(x * block_width + 4, y * block_height + 4, block_width - 8, block_height - 8, 1, color_d, color_l);
-}
-
-function drawBlock(block, x, y)
-{
-  var bgfade = blocks_canvas_context.createLinearGradient(x * block_width, y * block_height, x * block_width, (y + 1) * block_height - 1);
-
-  var color = "hsl(" + block.hue + ", 100%, 50%)";
-  var color_l = "hsl(" + block.hue + ", 100%, 80%)";
-  var color_d = "hsl(" + block.hue + ", 100%, 10%)";
-
-  bgfade.addColorStop(0.4, color);
-  bgfade.addColorStop(0.0, color_l);
-  bgfade.addColorStop(1.0, color_d);
-  blocks_canvas_context.fillStyle =  bgfade;
-  blocks_canvas_context.fillRect(x * block_width, y * block_height, block_width, block_height);
-  blocks_canvas_context.strokeStyle = "#111111";
-  blocks_canvas_context.strokeRect(x * block_width, y * block_height, block_width, block_height);
-}
-
-function removeBlock(block)
-{
-   this.isBlock = false;
-   score = score + 50;
-   blocks_canvas_is_dirty = true;
-   blockCount--;
 }
 
 function drawBlocks()
 {
    if (blocks_canvas_is_dirty)
    {
+      var blocks_canvas_context = blocks_canvas.getContext("2d");
       blocks_canvas_context.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
       for (var x = 0; x < blockArray_width; x++)
       {
-	  for (var y = 0; y < blockArray_height; y++)
-	  {
-	      if (blockArray[x][y].isBlock)
-	      {
-		 blockArray[x][y].draw(blockArray[x][y], x, y);
-	      }
-	  }
+         for (var y = 0; y < blockArray_height; y++)
+         {
+            blockArray[x][y].draw(blocks_canvas_context, x, y);
+         }
       }
       blocks_canvas_is_dirty = false;
    }
@@ -413,24 +373,80 @@ function onGameOverClick(event)
     startMenuScene.activate();
 }
 
-function hit_static_block()
+function NormalBlock(hue)
 {
-   static_hit_count--;
-   if (static_hit_count <= 0)
-   {
-      for (var x = 0; x < blockArray_width; x++)
+   this.draw = function(context, x, y)
       {
-	  for (var y = 0; y < blockArray_height; y++)
-	  {
-	      if (blockArray[x][y].isBlock && blockArray[x][y].blockType == BLOCK_TYPE_STATIC)
-	      {
-		 blockArray[x][y].isBlock = false;
-		 score = score + 1;
-	      }
-	  }
-      }
-      blocks_canvas_is_dirty = true;
-   }
+         var color   = "hsl(" + hue + ", 100%, 50%)";
+         var color_l = "hsl(" + hue + ", 100%, 80%)";
+         var color_d = "hsl(" + hue + ", 100%, 10%)";
+
+         context.fillStyle = color;
+         context.fillRect(  x * block_width + 2, y * block_height + 2, block_width - 4, block_height - 4);
+         drawFrame(context, x * block_width,     y * block_height,     block_width,     block_height,     2, color_l, color_d);
+         drawFrame(context, x * block_width + 4, y * block_height + 4, block_width - 8, block_height - 8, 1, color_d, color_l);
+      };
+
+   this.doCollisionEffect = function ()
+      {
+         this.draw = function(context, x, y) {};
+         this.doCollisionEffect = function() { return false; };
+         score = score + 50;
+         blocks_canvas_is_dirty = true;
+         blockCount--;
+         return true;
+      };
+}
+
+function StaticBlock(hue)
+{
+   this.draw = function(context, x, y)
+      {
+         var bgfade = context.createLinearGradient(x * block_width, y * block_height, x * block_width, (y + 1) * block_height - 1);
+
+         var color =   "hsl(" + hue + ", 100%, 50%)";
+         var color_l = "hsl(" + hue + ", 100%, 80%)";
+         var color_d = "hsl(" + hue + ", 100%, 10%)";
+
+         bgfade.addColorStop(0.4, color);
+         bgfade.addColorStop(0.0, color_l);
+         bgfade.addColorStop(1.0, color_d);
+         context.fillStyle =  bgfade;
+         context.fillRect(  x * block_width, y * block_height, block_width, block_height);
+         context.strokeStyle = "#111111";
+         context.strokeRect(x * block_width, y * block_height, block_width, block_height);
+      };
+   this.doCollisionEffect = function()
+      {
+         static_hit_count--;
+         if (static_hit_count <= 0)
+         {
+            for (var x = 0; x < blockArray_width; x++)
+            {
+               for (var y = 0; y < blockArray_height; y++)
+               {
+                  if (blockArray[x][y].removeBlock)
+                  {
+                     blockArray[x][y].removeBlock();
+                  }
+               }
+            }
+            blocks_canvas_is_dirty = true;
+         }
+         return true;
+      };
+   this.removeBlock = function()
+      {
+         this.draw = function(context, x, y) {};
+         this.doCollisionEffect = function() { return false; };
+         score = score + 1;
+      };
+}
+
+function NoneBlock()
+{
+   this.draw = function(context, x, y) {};
+   this.doCollisionEffect = function() { return false; };
 }
 
 function createLevel(levelDescription)
@@ -453,28 +469,31 @@ function createLevel(levelDescription)
     
    values.sort(function(a,b) {return b - a;});
 
-   var blockThresholdValue = values[Math.floor((values.length - 1) * 0.4)];
-   var staticThresholdValue = values[Math.floor((values.length - 1 ) * 0.1)];
-   var max = values[0];   
+   var blockThresholdValue  = values[Math.floor((values.length - 1) * 0.4)];
+   var staticThresholdValue = values[Math.floor((values.length - 1) * 0.1)];
+   var max = values[0];
    
    blockCount = 0;
    for (var x = 0; x < blockArray_width; x++)
    {
-       for (var y = 0; y < blockArray_height; y++)
-       {
-            value = blockArray[x][y];
-            blockArray[x][y] = {
-				isBlock: value > blockThresholdValue,
-				hue: (((value - blockThresholdValue) / (max - blockThresholdValue)) * levelDescription.hueRange + levelDescription.hueOffset),
-				blockType: value > staticThresholdValue ? BLOCK_TYPE_STATIC : BLOCK_TYPE_NORMAL,
-				draw:  value > staticThresholdValue ? drawBlock : drawBlock_2,
-				doCollisionEffect: value > staticThresholdValue ? hit_static_block : removeBlock,
-			      };
-            if (blockArray[x][y].isBlock && blockArray[x][y].blockType != BLOCK_TYPE_STATIC)
-            {
-                blockCount++;
-            }
-       }
+      for (var y = 0; y < blockArray_height; y++)
+      {
+         value = blockArray[x][y];
+         if (value <= blockThresholdValue)
+         {
+            blockArray[x][y] = new NoneBlock();
+            continue;
+         }
+         var hue = (((value - blockThresholdValue) / (max - blockThresholdValue)) * levelDescription.hueRange + levelDescription.hueOffset);
+         if (value > staticThresholdValue)
+         {
+            blockArray[x][y] = new StaticBlock(hue);
+            continue;
+         }
+         blockArray[x][y] = new NormalBlock(hue);
+         blockCount++;
+         continue;
+      }
    }
 
    return blockArray;
@@ -490,6 +509,15 @@ function createCanvas(size)
    return canvas;
 }
 
+function createScenes()
+{
+   emptyScene = new Scene(doNothing, doNothing, doNothing, {});
+   startMenuScene = new Scene(function() {lives = 3; score = 0; static_hit_count = 50;}, doNothing, drawStartMenu, {click: onMenuClick});
+   playScene = new Scene(BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
+   gameOverScene = new Scene(doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
+   currentScene = emptyScene;
+}
+
 function Start()
 {  
    windowCanvas = document.getElementById("myCanvas");
@@ -498,15 +526,9 @@ function Start()
    lastTimeStamp = 0;
    window.requestAnimFrame = GetRequestAnimFrameFunction();   
    initRun();
-
-   emptyScene = new Scene(doNothing, doNothing, doNothing, {});
-   startMenuScene = new Scene(function() {lives = 3; score = 0;}, doNothing, drawStartMenu, {click: onMenuClick});
-   playScene = new Scene(BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
-   gameOverScene = new Scene(doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
-   currentScene = emptyScene;
+   createScenes();
    
    blocks_canvas = createCanvas(windowCanvas);
-   blocks_canvas_context = blocks_canvas.getContext("2d");
 
    panel_canvas = createCanvas(panel.size);
    drawPanel(panel_canvas.getContext("2d"), 0, 0, panel.size.width, panel.size.height);
