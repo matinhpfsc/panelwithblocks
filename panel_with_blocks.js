@@ -3,11 +3,10 @@
 var moveBall = MoveBall;
 var counter = -1;
 var canvasContext = null;
-var windowWidth = 0;
-var windowHeight = 0;
+var windowCanvas = null;
 var lastTimeStamp = 0;
 var ball = {location: {x:0, y:0}, speed: {x:0, y:0}, radius:5};
-var panel = {location: {x:0, y:570}, size: {width:70, height:10}};
+var panel = {location: {x:0, y:570}, size: new Size(70, 10)};
 var ball_panel_x_delta = 0;
 var lives = 0;
 var score = 0;
@@ -26,14 +25,18 @@ var gameOverScene;
 var blocks_canvas;
 var blocks_canvas_context;
 var panel_canvas;
-var panel_canvas_context;
 var ball_canvas;
-var ball_canvas_context;
 var blocks_canvas_is_dirty;
 var BLOCK_TYPE_NORMAL = 1;
 var BLOCK_TYPE_STATIC = 2;
 var static_hit_count = 50;
 var current_level_index = 0;
+
+function Size(width, height)
+{
+   this.width = width;
+   this.height = height;
+}
 
 function hash(number)
 {
@@ -90,7 +93,7 @@ function calculatePlayScene(deltaTime)
     var ball_x_border = ball.location.x + Math.sign(ball.speed.x) * ball.radius;
     var ball_y_border = ball.location.y + Math.sign(ball.speed.y) * ball.radius;
     
-    if ((ball_x_border <= 0 && ball.speed.x < 0) || (ball_x_border >= windowWidth && ball.speed.x > 0))
+    if ((ball_x_border <= 0 && ball.speed.x < 0) || (ball_x_border >= windowCanvas.width && ball.speed.x > 0))
     {
 	ball.speed.x = -ball.speed.x;
     increaseSpeed();
@@ -100,7 +103,7 @@ function calculatePlayScene(deltaTime)
 	ball.speed.y = -ball.speed.y;
     increaseSpeed();
     }
-    if (ball_y_border >= windowHeight && ball.speed.y > 0)
+    if (ball_y_border >= windowCanvas.height && ball.speed.y > 0)
     {
 	lives--;
 	initRun();
@@ -166,14 +169,14 @@ function GetSaveBlockArrayValue(x, y)
 
 function drawStartMenu()
 {
-    canvasContext.clearRect(0, 0, windowWidth, windowHeight);
+    canvasContext.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
     canvasContext.fillStyle = "rgba(0, 0, 0, 0.5)";
     canvasContext.font = "bold 60pt Times New Roman";
     canvasContext.textBaseline = "middle";
     canvasContext.textAlign = "center";
     var text = "Panel With Blocks";
-    canvasContext.fillText(text, windowWidth / 2, windowHeight / 2);
-    canvasContext.strokeText(text, windowWidth / 2, windowHeight / 2);
+    canvasContext.fillText(text, windowCanvas.width / 2, windowCanvas.height / 2);
+    canvasContext.strokeText(text, windowCanvas.width / 2, windowCanvas.height / 2);
 }
 
 function drawBall(canvasContext2, left, top, radius)
@@ -247,7 +250,7 @@ function drawBlocks()
 {
    if (blocks_canvas_is_dirty)
    {
-      blocks_canvas_context.clearRect(0, 0, windowWidth, windowHeight);
+      blocks_canvas_context.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
       for (var x = 0; x < blockArray_width; x++)
       {
 	  for (var y = 0; y < blockArray_height; y++)
@@ -288,8 +291,8 @@ function drawTextLayer()
    canvasContext.textBaseline = "top";
    canvasContext.textAlign = "right";
    var text = "Lives: " + lives;
-   canvasContext.fillText(text, windowWidth, 0);
-   canvasContext.strokeText(text, windowWidth, 0);
+   canvasContext.fillText(text, windowCanvas.width, 0);
+   canvasContext.strokeText(text, windowCanvas.width, 0);
 
    canvasContext.textAlign = "left";
    var text = "Score: " + score;
@@ -299,7 +302,7 @@ function drawTextLayer()
 
 function drawLevel()
 {
-        canvasContext.clearRect(0, 0, windowWidth, windowHeight);
+        canvasContext.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
         //canvasContext.clearRect(currentBallX - 10, currentBallY - 10, ball.radius * 2 + 20, ball.radius * 2 + 20);
         drawBlocks();
         canvasContext.drawImage(ball_canvas, Math.floor(ball.location.x - ball.radius), Math.floor(ball.location.y - ball.radius));
@@ -314,8 +317,8 @@ function DrawCanvasGameOver()
    canvasContext.textBaseline = "middle";
    canvasContext.textAlign = "center";
    var text = "Game Over";
-   canvasContext.fillText(text, windowWidth / 2, windowHeight / 2);
-   canvasContext.strokeText(text, windowWidth / 2, windowHeight / 2);
+   canvasContext.fillText(text, windowCanvas.width / 2, windowCanvas.height / 2);
+   canvasContext.strokeText(text, windowCanvas.width / 2, windowCanvas.height / 2);
 }
 
 function GameLoop()
@@ -337,8 +340,8 @@ function BuildNewLevel()
    blockArray_width = 20;
    blockArray_height = 17;
    
-   block_width = windowWidth / blockArray_width;
-   block_height = windowHeight / (2 * blockArray_height);    
+   block_width = windowCanvas.width / blockArray_width;
+   block_height = windowCanvas.height / (2 * blockArray_height);    
     
    //blockArray = createLevel(level[current_level_index]);
    blockArray = createLevel(getLevelDefintion(current_level_index));
@@ -382,14 +385,14 @@ function initRun()
    ball.location.y = panel.location.y - ball.radius;
    ball.speed.x = 0.12;
    ball.speed.y = -0.24;
-   panel.location.x = windowWidth / 2;
+   panel.location.x = windowCanvas.width / 2;
    ball_panel_x_delta = 0;
    moveBall = moveBallWithPanel;
 }
 
 function onMouseMove(event)
 {
-    panel.location.x = Math.min(event.clientX, windowWidth - panel.size.width / 2);
+    panel.location.x = Math.min(event.clientX, windowCanvas.width - panel.size.width / 2);
     panel.location.x = Math.max(panel.location.x, panel.size.width / 2);
 }
 
@@ -479,19 +482,19 @@ function createLevel(levelDescription)
 
 function sqr(a) { return a * a; }
 
+function createCanvas(size)
+{
+   var canvas = document.createElement("canvas");
+   canvas.width = size.width;
+   canvas.height = size.height;
+   return canvas;
+}
+
 function Start()
 {  
-   var canvas = document.getElementById("myCanvas");
-   
-   //canvas.style.width = "100%";
-   
-   //canvas.width = window.innerWidth * 0.9;
-   //canvas.height = window.innerHeight * 0.9;
-   canvasContext = canvas.getContext("2d");
+   windowCanvas = document.getElementById("myCanvas");
+   canvasContext = windowCanvas.getContext("2d");
 
-   windowWidth = canvas.width;
-   windowHeight = canvas.height;
-   
    lastTimeStamp = 0;
    window.requestAnimFrame = GetRequestAnimFrameFunction();   
    initRun();
@@ -502,22 +505,14 @@ function Start()
    gameOverScene = new Scene(doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
    currentScene = emptyScene;
    
-   blocks_canvas = document.createElement("canvas");
-   blocks_canvas.width = windowWidth;
-   blocks_canvas.height = windowHeight;
+   blocks_canvas = createCanvas(windowCanvas);
    blocks_canvas_context = blocks_canvas.getContext("2d");
 
-   panel_canvas = document.createElement("canvas");
-   panel_canvas.width = panel.size.width;
-   panel_canvas.height = panel.size.height;
-   panel_canvas_context = panel_canvas.getContext("2d");   
-   drawPanel(panel_canvas_context, 0, 0, panel.size.width, panel.size.height);
+   panel_canvas = createCanvas(panel.size);
+   drawPanel(panel_canvas.getContext("2d"), 0, 0, panel.size.width, panel.size.height);
 
-   ball_canvas = document.createElement("canvas");
-   ball_canvas.width = ball.radius * 2;
-   ball_canvas.height = ball.radius * 2;
-   ball_canvas_context = ball_canvas.getContext("2d");   
-   drawBall(ball_canvas_context, 0, 0, ball.radius);
+   ball_canvas = createCanvas(new Size(ball.radius * 2, ball.radius * 2));
+   drawBall(ball_canvas.getContext("2d"), 0, 0, ball.radius);
    
    window.requestAnimFrame(GameLoop);
    startMenuScene.activate();
@@ -527,7 +522,7 @@ function doNothing() {}
 
 function GetRequestAnimFrameFunction() {
     //These part copied from http://www.paulirish.com/2011/requestanimationframe-for-smart-animating/:
-    // shim layer with setTimeout fallback
+    //shim layer with setTimeout fallback
    return window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
         window.mozRequestAnimationFrame ||
