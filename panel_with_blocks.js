@@ -27,8 +27,6 @@ var blocks_canvas;
 var panel_canvas;
 var ball_canvas;
 var blocks_canvas_is_dirty;
-var BLOCK_TYPE_NORMAL = 1;
-var BLOCK_TYPE_STATIC = 2;
 var static_hit_count = 50;
 var current_level_index = 0;
 
@@ -86,65 +84,82 @@ function GameStep(deltaTime)
    currentScene.drawCanvas();
 }
 
+function GetSaveBlockOnCoords(x, y)
+{
+   var cell_x = Math.floor(x / block_width);
+   var cell_y = Math.floor(y / block_height);
+   return GetSaveBlockArrayValue(cell_x, cell_y);
+}
+
+function CalculateBlockCollision(i)
+{
+   var j = 1 - i;
+   
+   var x_coord_f = ball.location.x + Math.sign(ball.speed.x) * ball.radius * i;
+   var x_coord_b = ball.location.x - Math.sign(ball.speed.x) * ball.radius * i;
+   var y_coord_f = ball.location.y + Math.sign(ball.speed.y) * ball.radius * j;
+   var y_coord_b = ball.location.y - Math.sign(ball.speed.y) * ball.radius * j;
+
+   var fc = GetSaveBlockOnCoords(x_coord_f, y_coord_f);
+   if (fc.isBlock() && !GetSaveBlockOnCoords(x_coord_b, y_coord_b).isBlock())
+   {
+      fc.doCollisionEffect();
+      ball.speed.x = ball.speed.x * (1 - 2 * i);
+      ball.speed.y = ball.speed.y * (1 - 2 * j);
+      increaseSpeed();
+   }
+}
+
+function ball_hits_panel()
+{
+   var y_coord_f = ball.location.y + Math.sign(ball.speed.y) * ball.radius;
+   
+   return ball.speed.y > 0 && y_coord_f >= panel.location.y
+       && y_coord_f < panel.location.y + panel.size.height
+       && ball.location.x >= panel.location.x - panel.size.width / 2
+       && ball.location.x <= panel.location.x + panel.size.width / 2;
+}
+
+function calculateCollisions()
+{
+   var ball_y_border = ball.location.y + Math.sign(ball.speed.y) * ball.radius;
+
+   // Is ball falling down?
+   if (ball_y_border >= windowCanvas.height && ball.speed.y > 0)
+   {
+      lives--;
+      initRun();
+   }
+
+   // Hits the ball a block?
+   CalculateBlockCollision(1);
+   CalculateBlockCollision(0);
+   if (blockCount <= 0)
+   {
+      playScene.activate();
+   }
+
+   if (ball_hits_panel())
+   {
+      var normal_x = (ball.location.x - panel.location.x) / panel.size.width;
+      var normal_y = -Math.sqrt(1 - normal_x * normal_x);
+
+      var speed_delta = -2 * (ball.speed.x * normal_x + ball.speed.y * normal_y);
+
+      ball.speed.x = speed_delta * normal_x + ball.speed.x;
+      ball.speed.y = speed_delta * normal_y + ball.speed.y;
+      increaseSpeed();
+   }
+}
+
 function calculatePlayScene(deltaTime)
 {
-    moveBall(deltaTime);
-    
-    var ball_x_border = ball.location.x + Math.sign(ball.speed.x) * ball.radius;
-    var ball_y_border = ball.location.y + Math.sign(ball.speed.y) * ball.radius;
-    
-    if ((ball_x_border <= 0 && ball.speed.x < 0) || (ball_x_border >= windowCanvas.width && ball.speed.x > 0))
-    {
-	ball.speed.x = -ball.speed.x;
-    increaseSpeed();
-    }
-    if (ball_y_border <= 0 && ball.speed.y < 0)
-    {
-	ball.speed.y = -ball.speed.y;
-    increaseSpeed();
-    }
-    if (ball_y_border >= windowCanvas.height && ball.speed.y > 0)
-    {
-	lives--;
-	initRun();
-    }
-    var cell_x_border = Math.trunc(ball_x_border / block_width);
-    var cell_y_border = Math.trunc(ball_y_border / block_height);
-    var cell_x = Math.trunc(ball.location.x / block_width);
-    var cell_y = Math.trunc(ball.location.y / block_height);
-
-   if (GetSaveBlockArrayValue(cell_x_border, cell_y).doCollisionEffect())
+   moveBall(deltaTime);
+   calculateCollisions();
+   if (lives <= 0)
    {
-      ball.speed.x = -ball.speed.x;
-      increaseSpeed();
+      gameOverScene.activate();
    }
-   if (GetSaveBlockArrayValue(cell_x, cell_y_border).doCollisionEffect())
-   {
-      ball.speed.y = -ball.speed.y;
-      increaseSpeed();
-   }
-    if (blockCount <= 0)
-    {
-	playScene.activate();
-    }
-    
-    if (ball.speed.y > 0 && ball_y_border >= panel.location.y && ball_y_border < panel.location.y + panel.size.height && ball.location.x >= panel.location.x - panel.size.width / 2 && ball.location.x <= panel.location.x + panel.size.width / 2)
-    {
-	var w = 2 * (ball.location.x - panel.location.x) / panel.size.width;
-	var normal_x = w * (0.5);
-	var normal_y = -Math.sqrt(1 - normal_x * normal_x);
-
-	var speed_delta = -2 * (ball.speed.x * normal_x + ball.speed.y * normal_y);
-	
-	ball.speed.x = speed_delta * normal_x + ball.speed.x;
-	ball.speed.y = speed_delta * normal_y + ball.speed.y;
-    increaseSpeed();
-    }
-    
-    if (lives <= 0)
-    {
-	gameOverScene.activate();
-    }
 }
 
 function increaseSpeed()
@@ -160,11 +175,15 @@ var noneBlock = new NoneBlock();
 
 function GetSaveBlockArrayValue(x, y)
 {
-    if (x >= 0 && x < blockArray_width && y >= 0 && y < blockArray_height)
-    {
-        return blockArray[x][y];
-    }
-    return noneBlock;
+   if (x < 0 || y < 0 || x >= blockArray_width)
+   {
+      return {isBlock: function() { return true; }, doCollisionEffect: function() { return true; } };
+   }
+   if (x >= 0 && x < blockArray_width && y >= 0 && y < blockArray_height)
+   {
+      return blockArray[x][y];
+   }
+   return noneBlock;
 }
 
 function drawStartMenu()
@@ -321,23 +340,23 @@ function Scene(initScene, calculateStep, drawCanvas, eventHandlers)
    this.drawCanvas = drawCanvas;
    this.eventHandlers = eventHandlers;
    this.activate = function()
-   {
-      if (currentScene != null)
       {
-	 //Remove the event handlers of the current scene.
-	 for (var eventName in currentScene.eventHandlers)
-	 {
-            window.removeEventListener(eventName, currentScene.eventHandlers[eventName], false);
-	 }
-      }
-      currentScene = this;
-      currentScene.init();
-      //Add the event handlers of the current scene.
-      for (var eventName in currentScene.eventHandlers)
-      {
-	window.addEventListener(eventName, currentScene.eventHandlers[eventName], false);
-      }
-   };
+         if (currentScene != null)
+         {
+            //Remove the event handlers of the current scene.
+            for (var eventName in currentScene.eventHandlers)
+            {
+               window.removeEventListener(eventName, currentScene.eventHandlers[eventName], false);
+            }
+         }
+         currentScene = this;
+         currentScene.init();
+         //Add the event handlers of the current scene.
+         for (var eventName in currentScene.eventHandlers)
+         {
+            window.addEventListener(eventName, currentScene.eventHandlers[eventName], false);
+         }
+      };
 }
 
 function initRun()
@@ -376,6 +395,7 @@ function onGameOverClick(event)
 
 function NormalBlock(hue)
 {
+   this.isBlock = function() { return true; };
    this.draw = function(context, x, y)
       {
          var color   = "hsl(" + hue + ", 100%, 50%)";
@@ -390,6 +410,7 @@ function NormalBlock(hue)
 
    this.doCollisionEffect = function ()
       {
+         this.isBlock = function() { return false; };
          this.draw = function(context, x, y) {};
          this.doCollisionEffect = function() { return false; };
          score = score + 50;
@@ -401,6 +422,7 @@ function NormalBlock(hue)
 
 function CentralStaticFunctions()
 {
+   this.isBlock = function() { return true; };
    this.draw = function(context, hue, x, y)
       {
          var bgfade = context.createLinearGradient(x * block_width, y * block_height, x * block_width, (y + 1) * block_height - 1);
@@ -422,6 +444,7 @@ function CentralStaticFunctions()
          static_hit_count--;
          if (static_hit_count <= 0)
          {
+            this.isBlock = function() { return false; };
             this.draw = function(context, x, y) {};
             this.doCollisionEffect = function() { return false; };
             score = score + staticBlockCount;
@@ -433,6 +456,10 @@ function CentralStaticFunctions()
 
 function StaticBlock(hue, centralStaticFunctions)
 {
+   this.isBlock = function()
+      {
+         return centralStaticFunctions.isBlock();
+      }
    this.draw = function(context, x, y)
       {
          centralStaticFunctions.draw(context, hue, x, y);
@@ -445,6 +472,7 @@ function StaticBlock(hue, centralStaticFunctions)
 
 function NoneBlock()
 {
+   this.isBlock = function() { return false; };
    this.draw = function(context, x, y) {};
    this.doCollisionEffect = function() { return false; };
 }
@@ -514,11 +542,20 @@ function createCanvas(size)
 
 function createScenes()
 {
-   emptyScene = new Scene(doNothing, doNothing, doNothing, {});
+   emptyScene     = new Scene(doNothing, doNothing, doNothing, {});
    startMenuScene = new Scene(function() {lives = 3; score = 0; static_hit_count = 50;}, doNothing, drawStartMenu, {click: onMenuClick});
-   playScene = new Scene(BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
-   gameOverScene = new Scene(doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
-   currentScene = emptyScene;
+   playScene      = new Scene(BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
+   gameOverScene  = new Scene(doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
+   currentScene   = emptyScene;
+}
+
+function createSprites()
+{
+   blocks_canvas = createCanvas(windowCanvas);
+   panel_canvas = createCanvas(panel.size);
+   drawPanel(panel_canvas.getContext("2d"), 0, 0, panel.size.width, panel.size.height);
+   ball_canvas = createCanvas(new Size(ball.radius * 2, ball.radius * 2));
+   drawBall(ball_canvas.getContext("2d"), 0, 0, ball.radius);
 }
 
 function Start()
@@ -530,14 +567,7 @@ function Start()
    window.requestAnimFrame = GetRequestAnimFrameFunction();   
    initRun();
    createScenes();
-   
-   blocks_canvas = createCanvas(windowCanvas);
-
-   panel_canvas = createCanvas(panel.size);
-   drawPanel(panel_canvas.getContext("2d"), 0, 0, panel.size.width, panel.size.height);
-
-   ball_canvas = createCanvas(new Size(ball.radius * 2, ball.radius * 2));
-   drawBall(ball_canvas.getContext("2d"), 0, 0, ball.radius);
+   createSprites();
    
    window.requestAnimFrame(GameLoop);
    startMenuScene.activate();
