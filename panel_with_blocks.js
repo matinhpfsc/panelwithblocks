@@ -186,22 +186,31 @@ function GetSaveBlockArrayValue(x, y)
    return noneBlock;
 }
 
+function setFontStyle(canvasContext, alpha, align, baseline, size, font)
+{
+   canvasContext.fillStyle    = `rgba(0, 0, 0, ${alpha})`;
+   canvasContext.font         = `bold ${size}pt ${font}`;
+   canvasContext.textBaseline = baseline;
+   canvasContext.textAlign    = align;
+}
+
+function writeText(canvasContext, x, y, text)
+{
+   canvasContext.fillText  (text, x, y);
+   canvasContext.strokeText(text, x, y);
+}
+
 function drawStartMenu()
 {
-    canvasContext.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
-    canvasContext.fillStyle = "rgba(0, 0, 0, 0.5)";
-    canvasContext.font = "bold 60pt Times New Roman";
-    canvasContext.textBaseline = "middle";
-    canvasContext.textAlign = "center";
-    var text = "Panel With Blocks";
-    canvasContext.fillText(text, windowCanvas.width / 2, windowCanvas.height / 2);
-    canvasContext.strokeText(text, windowCanvas.width / 2, windowCanvas.height / 2);
+   canvasContext.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
+   setFontStyle(canvasContext, 0.5, "center", "middle", 60, "Times New Roman");
+   writeText(canvasContext, windowCanvas.width / 2, windowCanvas.height / 2, "Panel With Blocks");
 }
 
 function drawBall(canvasContext2, left, top, radius)
 {
    var sty = canvasContext2.createRadialGradient(left + radius * 2 / 3, top + radius * 2 / 3, 0, 
-						left + radius, top + radius, radius);
+                                                 left + radius, top + radius, radius);
    sty.addColorStop(0.0, "#AAAAFF");
    sty.addColorStop(1.0, "#0000FF");
    canvasContext2.fillStyle = sty;
@@ -266,18 +275,10 @@ function drawPanel(canvasContext2, left, top, width, height)
 
 function drawTextLayer()
 {
-   canvasContext.fillStyle = "rgba(0, 0, 0, 0.45)";
-   canvasContext.font = "bold 30pt sans-serif";
-   canvasContext.textBaseline = "top";
-   canvasContext.textAlign = "right";
-   var text = "Lives: " + lives;
-   canvasContext.fillText(text, windowCanvas.width, 0);
-   canvasContext.strokeText(text, windowCanvas.width, 0);
-
-   canvasContext.textAlign = "left";
-   var text = "Score: " + score;
-   canvasContext.fillText(text, 0, 0);
-   canvasContext.strokeText(text, 0, 0);
+   setFontStyle(canvasContext, 0.45, "right", "top", 30, "sans-serif");
+   writeText(canvasContext, windowCanvas.width, 0, "Lives: " + lives);
+   setFontStyle(canvasContext, 0.45, "left", "top", 30, "sans-serif");
+   writeText(canvasContext, 0, 0, "Score: " + score);
 }
 
 function drawLevel()
@@ -291,14 +292,9 @@ function drawLevel()
 }
 
 function DrawCanvasGameOver()
-{   
-   canvasContext.fillStyle = "rgba(0, 0, 0, 0.01)";
-   canvasContext.font = "bold 90pt sans-serif";
-   canvasContext.textBaseline = "middle";
-   canvasContext.textAlign = "center";
-   var text = "Game Over";
-   canvasContext.fillText(text, windowCanvas.width / 2, windowCanvas.height / 2);
-   canvasContext.strokeText(text, windowCanvas.width / 2, windowCanvas.height / 2);
+{
+   setFontStyle(canvasContext, 0.01, "center", "middle", 90, "sans-serif");
+   writeText(canvasContext, windowCanvas.width / 2, windowCanvas.height / 2, "Game Over");
 }
 
 function GameLoop()
