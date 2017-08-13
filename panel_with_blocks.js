@@ -5,7 +5,7 @@ var counter = -1;
 var canvasContext = null;
 var windowCanvas = null;
 var lastTimeStamp = 0;
-var ball = {location: {x:0, y:0}, speed: {x:0, y:0}, radius:5};
+var ball =  {location: {x:0, y:0},   speed: {x:0, y:0}, radius:5};
 var panel = {location: {x:0, y:570}, size: new Size(70, 10)};
 var ball_panel_x_delta = 0;
 var lives = 0;
@@ -17,7 +17,7 @@ var block_height = 0;
 var blockArray = null;
 var blockCount = 0;
 var staticBlockCount = 0;
-var maximumAnimationTimeSpan = 100;
+var maximumAnimationTimeSpan = 20;
 var currentScene;
 var emptyScene;
 var startMenuScene;
@@ -134,10 +134,6 @@ function calculateCollisions()
    // Hits the ball a block?
    CalculateBlockCollision(1);
    CalculateBlockCollision(0);
-   if (blockCount <= 0)
-   {
-      playScene.activate();
-   }
 
    if (ball_hits_panel())
    {
@@ -149,6 +145,11 @@ function calculateCollisions()
       ball.speed.x = speed_delta * normal_x + ball.speed.x;
       ball.speed.y = speed_delta * normal_y + ball.speed.y;
       increaseSpeed();
+   }
+
+   if (blockCount <= 0)
+   {
+      playScene.activate();
    }
 }
 
@@ -172,12 +173,13 @@ function increaseSpeed()
 }
 
 var noneBlock = new NoneBlock();
+var allBlock = {isBlock: function() { return true; }, doCollisionEffect: function() { return true; } };
 
 function GetSaveBlockArrayValue(x, y)
 {
    if (x < 0 || y < 0 || x >= blockArray_width)
    {
-      return {isBlock: function() { return true; }, doCollisionEffect: function() { return true; } };
+      return allBlock;
    }
    if (x >= 0 && x < blockArray_width && y >= 0 && y < blockArray_height)
    {
@@ -315,11 +317,11 @@ function BuildNewLevel()
  
    blockArray_width = 20;
    blockArray_height = 17;
+   static_hit_count = 50;
    
    block_width = windowCanvas.width / blockArray_width;
    block_height = windowCanvas.height / (2 * blockArray_height);    
     
-   //blockArray = createLevel(level[current_level_index]);
    blockArray = createLevel(getLevelDefintion(current_level_index));
    
    blocks_canvas_is_dirty = true;
@@ -539,7 +541,7 @@ function createCanvas(size)
 function createScenes()
 {
    emptyScene     = new Scene(doNothing, doNothing, doNothing, {});
-   startMenuScene = new Scene(function() {lives = 3; score = 0; static_hit_count = 50;}, doNothing, drawStartMenu, {click: onMenuClick});
+   startMenuScene = new Scene(function() {lives = 3; score = 0;}, doNothing, drawStartMenu, {click: onMenuClick});
    playScene      = new Scene(BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
    gameOverScene  = new Scene(doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
    currentScene   = emptyScene;
