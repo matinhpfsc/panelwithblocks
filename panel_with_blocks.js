@@ -1,34 +1,38 @@
 'use strict';
 
 var moveBall = MoveBall;
-var counter = -1;
-var canvasContext = null;
-var windowCanvas = null;
 var lastTimeStamp = 0;
 var ball =  {location: {x:0, y:0},   speed: {x:0, y:0}, radius:5};
 var panel = {location: {x:0, y:570}, size: new Size(70, 10)};
 var ball_panel_x_delta = 0;
 var lives = 0;
 var score = 0;
-var blockArray_width = 14;
-var blockArray_height = 14;
+var blockArray_width;
+var blockArray_height;
 var block_width = 0;
 var block_height = 0;
 var blockArray = null;
 var blockCount = 0;
-var staticBlockCount = 0;
 var maximumAnimationTimeSpan = 20;
+
 var currentScene;
 var emptyScene;
 var startMenuScene;
 var playScene;
 var gameOverScene;
+
+var canvasContext = null;
+var windowCanvas = null;
 var blocks_canvas;
 var panel_canvas;
 var ball_canvas;
-var blocks_canvas_is_dirty;
+
+var staticBlockCount = 0;
 var static_hit_count = 50;
 var current_level_index = 0;
+
+var noneBlock = new NoneBlock();
+var borderBlock = {isBlock: function() { return true; }, doCollisionEffect: function() { return true; } };
 
 function Size(width, height)
 {
@@ -172,14 +176,11 @@ function increaseSpeed()
    }
 }
 
-var noneBlock = new NoneBlock();
-var allBlock = {isBlock: function() { return true; }, doCollisionEffect: function() { return true; } };
-
 function GetSaveBlockArrayValue(x, y)
 {
    if (x < 0 || y < 0 || x >= blockArray_width)
    {
-      return allBlock;
+      return borderBlock;
    }
    if (x >= 0 && x < blockArray_width && y >= 0 && y < blockArray_height)
    {
@@ -241,7 +242,7 @@ function drawFrame(context, x, y, width, height, deep, color_top, color_bottom)
 
 function drawBlocks()
 {
-   if (blocks_canvas_is_dirty)
+   if (blocks_canvas.is_dirty)
    {
       var blocks_canvas_context = blocks_canvas.getContext("2d");
       blocks_canvas_context.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
@@ -252,7 +253,7 @@ function drawBlocks()
             blockArray[x][y].draw(blocks_canvas_context, x, y);
          }
       }
-      blocks_canvas_is_dirty = false;
+      blocks_canvas.is_dirty = false;
    }
    canvasContext.drawImage(blocks_canvas, 0, 0);
 }
@@ -324,7 +325,7 @@ function BuildNewLevel()
     
    blockArray = createLevel(getLevelDefintion(current_level_index));
    
-   blocks_canvas_is_dirty = true;
+   blocks_canvas.is_dirty = true;
    
    current_level_index++;
    
@@ -383,7 +384,6 @@ function onClick(event)
 function onMenuClick(event)
 {
     playScene.activate();
-    counter = 0;
 }
 
 function onGameOverClick(event)
@@ -412,7 +412,7 @@ function NormalBlock(hue)
          this.draw = function(context, x, y) {};
          this.doCollisionEffect = function() { return false; };
          score = score + 50;
-         blocks_canvas_is_dirty = true;
+         blocks_canvas.is_dirty = true;
          blockCount--;
          return true;
       };
@@ -446,7 +446,7 @@ function CentralStaticFunctions()
             this.draw = function(context, x, y) {};
             this.doCollisionEffect = function() { return false; };
             score = score + staticBlockCount;
-            blocks_canvas_is_dirty = true;
+            blocks_canvas.is_dirty = true;
          }
          return true;
       };
