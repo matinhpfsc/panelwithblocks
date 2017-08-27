@@ -1,7 +1,6 @@
 'use strict';
 
 var moveBall = MoveBall;
-var lastTimeStamp = 0;
 var ball =  {location: {x:0, y:0},   speed: {x:0, y:0}, radius:5};
 var panel = {location: {x:0, y:570}, size: new Size(70, 10)};
 var ball_panel_x_delta = 0;
@@ -13,10 +12,7 @@ var block_width = 0;
 var block_height = 0;
 var blockArray = null;
 var blockCount = 0;
-var maximumAnimationTimeSpan = 20;
 
-var currentScene;
-var emptyScene;
 var startMenuScene;
 var playScene;
 var gameOverScene;
@@ -80,12 +76,6 @@ function moveBallWithPanel(deltaTime)
 {
    ball.location.x = panel.location.x + ball_panel_x_delta;
    ball.location.y = panel.location.y - ball.radius;
-}
-
-function GameStep(deltaTime)
-{
-   currentScene.calculateStep(deltaTime);
-   currentScene.drawCanvas();
 }
 
 function GetSaveBlockOnCoords(x, y)
@@ -300,17 +290,6 @@ function DrawCanvasGameOver()
    writeText(canvasContext, windowCanvas.width / 2, windowCanvas.height / 2, "Game Over");
 }
 
-function GameLoop()
-{
-    var timeStamp = Date.now();
-    var timeSpan = timeStamp - lastTimeStamp;
-    timeSpan = Math.min(timeSpan, maximumAnimationTimeSpan); //To avoid greate jumps.
-  
-    GameStep(timeSpan);
-    lastTimeStamp = Date.now();
-    window.requestAnimFrame(GameLoop);
-}
-
 function BuildNewLevel()
 { 
    ball_panel_x_delta = 0;
@@ -332,7 +311,68 @@ function BuildNewLevel()
    initRun();
 }
 
-function Scene(initScene, calculateStep, drawCanvas, eventHandlers)
+function Game()
+{
+   function doNothing() {};
+   
+   this.currentScene = new Scene(this, doNothing, doNothing, doNothing, {});
+   this.lastTimeStamp = 0;
+   this.maximumAnimationTimeSpan = 20;
+   
+   this.getRequestAnimFrameFunction = function()
+      {
+         //These part copied from http://www.paulirish.com/2011/requestanimationframe-for-smart-animating/:
+         //shim layer with setTimeout fallback
+         return window.requestAnimationFrame ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                function(callback) {
+                      window.setTimeout(callback, 1000 / 60);
+                  };
+      };   
+   
+   window.requestAnimFrame = this.getRequestAnimFrameFunction();   
+   this.getTimeSpan = function()
+      {
+         var timeStamp = Date.now();
+         var timeSpan = timeStamp - this.lastTimeStamp;
+         return Math.min(timeSpan, this.maximumAnimationTimeSpan); //To avoid greate jumps.
+      };
+   
+   var owner = this;
+   function loop()
+      {
+         owner.nextStep(owner.getTimeSpan());
+         owner.lastTimeStamp = Date.now();
+         window.requestAnimFrame(loop);
+      };
+
+   this.nextStep = function(deltaTime)
+      {
+         this.currentScene.calculateStep(deltaTime);
+         this.currentScene.drawCanvas();
+      };
+      
+   this.activate = function(scene)
+      {
+         //Remove the event handlers of the current scene.
+         for (var eventName in this.currentScene.eventHandlers)
+         {
+            window.removeEventListener(eventName, this.currentScene.eventHandlers[eventName], false);
+         }
+         this.currentScene = scene;
+         this.currentScene.init();
+         //Add the event handlers of the current scene.
+         for (var eventName in this.currentScene.eventHandlers)
+         {
+            window.addEventListener(eventName, this.currentScene.eventHandlers[eventName], false);
+         }
+      };
+      
+   loop();
+}
+
+function Scene(game, initScene, calculateStep, drawCanvas, eventHandlers)
 {
    this.init = initScene;
    this.calculateStep = calculateStep;
@@ -340,21 +380,7 @@ function Scene(initScene, calculateStep, drawCanvas, eventHandlers)
    this.eventHandlers = eventHandlers;
    this.activate = function()
       {
-         if (currentScene != null)
-         {
-            //Remove the event handlers of the current scene.
-            for (var eventName in currentScene.eventHandlers)
-            {
-               window.removeEventListener(eventName, currentScene.eventHandlers[eventName], false);
-            }
-         }
-         currentScene = this;
-         currentScene.init();
-         //Add the event handlers of the current scene.
-         for (var eventName in currentScene.eventHandlers)
-         {
-            window.addEventListener(eventName, currentScene.eventHandlers[eventName], false);
-         }
+         game.activate(this);
       };
 }
 
@@ -371,24 +397,24 @@ function initRun()
 
 function onMouseMove(event)
 {
-    panel.location.x = Math.min(event.clientX, windowCanvas.width - panel.size.width / 2);
-    panel.location.x = Math.max(panel.location.x, panel.size.width / 2);
+   panel.location.x = Math.min(event.clientX, windowCanvas.width - panel.size.width / 2);
+   panel.location.x = Math.max(panel.location.x, panel.size.width / 2);
 }
 
 function onClick(event)
 {
-    ball_panel_x_delta = -1;
-    moveBall = MoveBall;
+   ball_panel_x_delta = -1;
+   moveBall = MoveBall;
 }
 
 function onMenuClick(event)
 {
-    playScene.activate();
+   playScene.activate();
 }
 
 function onGameOverClick(event)
 {
-    startMenuScene.activate();
+   startMenuScene.activate();
 }
 
 function NormalBlock(hue)
@@ -538,13 +564,11 @@ function createCanvas(size)
    return canvas;
 }
 
-function createScenes()
+function createScenes(game)
 {
-   emptyScene     = new Scene(doNothing, doNothing, doNothing, {});
-   startMenuScene = new Scene(function() {lives = 3; score = 0;}, doNothing, drawStartMenu, {click: onMenuClick});
-   playScene      = new Scene(BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
-   gameOverScene  = new Scene(doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
-   currentScene   = emptyScene;
+   startMenuScene = new Scene(game, function() {lives = 3; score = 0;}, doNothing, drawStartMenu, {click: onMenuClick});
+   playScene      = new Scene(game, BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
+   gameOverScene  = new Scene(game, doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
 }
 
 function createSprites()
@@ -561,13 +585,10 @@ function Start()
    windowCanvas = document.getElementById("myCanvas");
    canvasContext = windowCanvas.getContext("2d");
 
-   lastTimeStamp = 0;
-   window.requestAnimFrame = GetRequestAnimFrameFunction();   
-   initRun();
-   createScenes();
+   var game = new Game();
+   createScenes(game);
    createSprites();
    
-   window.requestAnimFrame(GameLoop);
    startMenuScene.activate();
 }
 
