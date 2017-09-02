@@ -1,8 +1,8 @@
 'use strict';
 
 var moveBall = MoveBall;
-var ball =  {location: {x:0, y:0},   speed: {x:0, y:0}, radius:5};
-var panel = {location: {x:0, y:570}, size: new Size(70, 10)};
+var ball = null;
+var panel = null;
 var ball_panel_x_delta = 0;
 var lives = 0;
 var score = 0;
@@ -12,6 +12,7 @@ var block_width = 0;
 var block_height = 0;
 var blockArray = null;
 var blockCount = 0;
+var maximumSpeed = 0;
 
 var startMenuScene;
 var playScene;
@@ -159,7 +160,7 @@ function calculatePlayScene(deltaTime)
 
 function increaseSpeed()
 {
-   if (Math.sqrt(ball.speed.x * ball.speed.x + ball.speed.y * ball.speed.y) < 0.5)
+   if (Math.sqrt(ball.speed.x * ball.speed.x + ball.speed.y * ball.speed.y) < maximumSpeed)
    {
        ball.speed.x = ball.speed.x * 1.01;
        ball.speed.y = ball.speed.y * 1.01;
@@ -196,7 +197,7 @@ function writeText(canvasContext, x, y, text)
 function drawStartMenu()
 {
    canvasContext.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
-   setFontStyle(canvasContext, 0.5, "center", "middle", 60, "Times New Roman");
+   setFontStyle(canvasContext, 0.5, "center", "middle", 0.1 * windowCanvas.height, "Times New Roman");
    writeText(canvasContext, windowCanvas.width / 2, windowCanvas.height / 2, "Panel With Blocks");
 }
 
@@ -268,25 +269,24 @@ function drawPanel(canvasContext2, left, top, width, height)
 
 function drawTextLayer()
 {
-   setFontStyle(canvasContext, 0.45, "right", "top", 30, "sans-serif");
+   setFontStyle(canvasContext, 0.45, "right", "top", 0.05 * windowCanvas.height, "sans-serif");
    writeText(canvasContext, windowCanvas.width, 0, "Lives: " + lives);
-   setFontStyle(canvasContext, 0.45, "left", "top", 30, "sans-serif");
+   setFontStyle(canvasContext, 0.45, "left", "top", 0.05 * windowCanvas.height, "sans-serif");
    writeText(canvasContext, 0, 0, "Score: " + score);
 }
 
 function drawLevel()
 {
-        canvasContext.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
-        //canvasContext.clearRect(currentBallX - 10, currentBallY - 10, ball.radius * 2 + 20, ball.radius * 2 + 20);
-        drawBlocks();
-        canvasContext.drawImage(ball_canvas, Math.floor(ball.location.x - ball.radius), Math.floor(ball.location.y - ball.radius));
-        canvasContext.drawImage(panel_canvas, Math.floor(panel.location.x - panel.size.width / 2), Math.floor(panel.location.y));
-        drawTextLayer();
+   canvasContext.clearRect(0, 0, windowCanvas.width, windowCanvas.height);
+   drawBlocks();
+   canvasContext.drawImage(ball_canvas, Math.floor(ball.location.x - ball.radius), Math.floor(ball.location.y - ball.radius));
+   canvasContext.drawImage(panel_canvas, Math.floor(panel.location.x - panel.size.width / 2), Math.floor(panel.location.y));
+   drawTextLayer();
 }
 
 function DrawCanvasGameOver()
 {
-   setFontStyle(canvasContext, 0.01, "center", "middle", 90, "sans-serif");
+   setFontStyle(canvasContext, 0.01, "center", "middle", 0.15 * windowCanvas.height, "sans-serif");
    writeText(canvasContext, windowCanvas.width / 2, windowCanvas.height / 2, "Game Over");
 }
 
@@ -388,8 +388,8 @@ function initRun()
 {
    ball.location.x = 0;
    ball.location.y = panel.location.y - ball.radius;
-   ball.speed.x = 0.12;
-   ball.speed.y = -0.24;
+   ball.speed.x = 0.00018 * windowCanvas.width;
+   ball.speed.y = - 2 * ball.speed.x;
    panel.location.x = windowCanvas.width / 2;
    ball_panel_x_delta = 0;
    moveBall = moveBallWithPanel;
@@ -566,7 +566,7 @@ function createCanvas(size)
 
 function createScenes(game)
 {
-   startMenuScene = new Scene(game, function() {lives = 3; score = 0;}, doNothing, drawStartMenu, {click: onMenuClick});
+   startMenuScene = new Scene(game, function() {current_level_index = 0; lives = 3; score = 0;}, doNothing, drawStartMenu, {click: onMenuClick});
    playScene      = new Scene(game, BuildNewLevel, calculatePlayScene, drawLevel, {mousemove: onMouseMove, click: onClick});
    gameOverScene  = new Scene(game, doNothing, doNothing, DrawCanvasGameOver, {click: onGameOverClick});
 }
@@ -585,6 +585,10 @@ function Start()
    windowCanvas = document.getElementById("myCanvas");
    canvasContext = windowCanvas.getContext("2d");
 
+   panel = {location: {x:0, y:0.95 * windowCanvas.height}, size: new Size(0.1 * windowCanvas.width, 0.02 * windowCanvas.height)};
+   ball  = {location: {x:0, y:0},   speed: {x:0, y:0}, radius:0.01 * windowCanvas.height};
+   maximumSpeed = 0.0008 * windowCanvas.width;
+   
    var game = new Game();
    createScenes(game);
    createSprites();
